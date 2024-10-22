@@ -34,7 +34,8 @@ The proxy server serves several purposes:
 
 ## Architecture Diagram
 
-![{1F0EECFD-E2B0-42F5-9329-1929425708FF}](https://github.com/user-attachments/assets/3ea64866-bbb8-4efc-9f67-390d2772ea1f)
+![{1F4E79C0-D30C-4108-95F3-461577D962B0}](https://github.com/user-attachments/assets/95010d5e-ad22-40a2-8a1b-7667e49f8b44)
+
 
 
 ### Key Components
