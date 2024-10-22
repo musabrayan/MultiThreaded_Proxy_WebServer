@@ -47,13 +47,9 @@ The proxy server serves several purposes:
 - **Synchronization**: Ensures thread safety using mutex and semaphores
 
 
-## Future Enhancements
+## FLow Chart
+![{89D909F1-D5D8-471E-A67F-BE00DB45B222}](https://github.com/user-attachments/assets/629945bf-6f38-42eb-8e48-90a057a7feee)
 
-This project can be extended in several ways:
-
-- **Multiprocessing:** Implementing multiprocessing can enhance performance through parallel processing.
-- **Website Filtering:** Extend the code to allow or block specific types of websites.
-- **Support for POST Requests:** Modify the proxy to handle POST requests in addition to GET requests.
 
 ## Note
 
