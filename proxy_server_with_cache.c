@@ -269,101 +269,108 @@ int checkHTTPversion(char *msg)
 
 void* thread_fn(void* socketNew)
 {
-    // Wait for the semaphore to ensure thread-safe access
-    sem_wait(&seamaphore); 
+    // Initialize all variables at the start
+    int* t = (int*)(socketNew);
+    int socket = *t;
+    int bytes_send_client = 0, len = 0;
+    char *buffer = NULL;
+    char *tempReq = NULL;
+    ParsedRequest* request = NULL;
+    
+    // Wait for semaphore with error checking
+    if (sem_wait(&seamaphore) != 0) {
+        perror("sem_wait failed");
+        return NULL;  // Return if semaphore wait fails
+    }
+
     int p;
-    sem_getvalue(&seamaphore, &p); // Get the current value of the semaphore
+    sem_getvalue(&seamaphore, &p);
     printf("Semaphore value before processing: %d\n", p);
 
-    int* t = (int*)(socketNew);
-    int socket = *t; // Socket is the socket descriptor of the connected client
-    int bytes_send_client, len; // Bytes transferred
+    // Allocate buffer with error checking
+    buffer = (char*)calloc(MAX_BYTES, sizeof(char));
+    if (!buffer) {
+        perror("Failed to allocate buffer");
+        goto cleanup;  // Jump to cleanup if allocation fails
+    }
+    bzero(buffer, MAX_BYTES);
 
-    // Create a buffer of MAX_BYTES for the client
-    char *buffer = (char*)calloc(MAX_BYTES, sizeof(char)); 
-    bzero(buffer, MAX_BYTES); // Initialize the buffer to zero
-
-    // Receive the request from the client
-    bytes_send_client = recv(socket, buffer, MAX_BYTES, 0); 
-    // Arguments for recv:
-    // - socket: the socket file descriptor for the connected client
-    // - buffer: pointer to the buffer where the received data will be stored
-    // - MAX_BYTES: maximum number of bytes to receive
-    // - 0: flags (0 means no special options)
-
-    // Loop until the complete request is received
+    // Receive initial request
+    bytes_send_client = recv(socket, buffer, MAX_BYTES, 0);
+    
+    // Receive complete request
     while (bytes_send_client > 0)
     {
         len = strlen(buffer);
-        // Loop until "\r\n\r\n" is found in the buffer
         if (strstr(buffer, "\r\n\r\n") == NULL)
         {   
             bytes_send_client = recv(socket, buffer + len, MAX_BYTES - len, 0);
         }
         else
         {
-            break; // Exit the loop if the complete request is received
+            break;
         }
     }
 
-    // Allocate memory for the temporary request
-    char *tempReq = (char*)malloc(strlen(buffer) * sizeof(char) + 1);
-    // Copy the buffer content to tempReq
-    for (size_t i = 0; i < strlen(buffer); i++)
-    {
-        tempReq[i] = buffer[i];
-    }
+    // Only proceed if we received data
+    if (bytes_send_client > 0) {
+        // Allocate and copy tempReq
+        tempReq = (char*)malloc(strlen(buffer) * sizeof(char) + 1);
+        if (!tempReq) {
+            perror("Failed to allocate tempReq");
+            goto cleanup;
+        }
+        strcpy(tempReq, buffer);
 
-    // Check for the request in the cache 
-    struct cache_element* temp = find(tempReq);
+        // Check cache
+        struct cache_element* temp = find(tempReq);
 
-    if (temp != NULL)
-    {
-        // Request found in cache, send the response to the client
-        int size = temp->len / sizeof(char);
-        int pos = 0;
-        char response[MAX_BYTES];
-
-        while (pos < size)
+        if (temp != NULL)
         {
-            bzero(response, MAX_BYTES); // Clear the response buffer
-            for (int i = 0; i < MAX_BYTES && pos < size; i++)
+            // Handle cached response (no changes needed here)
+            int size = temp->len / sizeof(char);
+            int pos = 0;
+            char response[MAX_BYTES];
+
+            while (pos < size)
             {
-                response[i] = temp->data[pos]; // Copy data from cache
-                pos++;
+                bzero(response, MAX_BYTES);
+                for (int i = 0; i < MAX_BYTES && pos < size; i++)
+                {
+                    response[i] = temp->data[pos];
+                    pos++;
+                }
+                send(socket, response, MAX_BYTES, 0);
             }
-            send(socket, response, MAX_BYTES, 0); // Send response to client
+            printf("Data retrieved from the cache.\n");
         }
-        printf("Data retrieved from the cache.\n");
-        // printf("%s\n", response); // Uncomment to print the response
-    }
-    else if (bytes_send_client > 0)
-    {
-        len = strlen(buffer); 
-        // Parsing the request
-        ParsedRequest* request = ParsedRequest_create();
-        
-        // ParsedRequest_parse returns 0 on success and -1 on failure
-        if (ParsedRequest_parse(request, buffer, len) < 0) 
+        else 
         {
-            fprintf(stderr, "Error: Parsing failed.\n");
-        }
-        else
-        {   
-            bzero(buffer, MAX_BYTES); // Clear the buffer for the next operation
-            if (!strcmp(request->method, "GET")) // Check if the method is GET
+            // Parse and handle new request
+            request = ParsedRequest_create();
+            if (!request) {
+                perror("Failed to create request");
+                goto cleanup;
+            }
+
+            if (ParsedRequest_parse(request, buffer, len) < 0) {
+                fprintf(stderr, "Error: Parsing failed.\n");
+                goto cleanup;
+            }
+
+            if (!strcmp(request->method, "GET"))
             {
                 if (request->host && request->path && (checkHTTPversion(request->version) == 1))
                 {
-                    bytes_send_client = handle_request(socket, request, tempReq); // Handle GET request
+                    bytes_send_client = handle_request(socket, request, tempReq);
                     if (bytes_send_client == -1)
                     {   
-                        sendErrorMessage(socket, 500); // Send 500 Internal Server Error
+                        sendErrorMessage(socket, 500);
                     }
                 }
                 else
                 {
-                    sendErrorMessage(socket, 500); // Send 500 Internal Error
+                    sendErrorMessage(socket, 500);
                 }
             }
             else
@@ -371,8 +378,6 @@ void* thread_fn(void* socketNew)
                 fprintf(stderr, "Error: This code doesn't support any method other than GET.\n");
             }
         }
-        // Freeing up the request pointer
-        ParsedRequest_destroy(request);
     }
     else if (bytes_send_client < 0)
     {
@@ -383,17 +388,21 @@ void* thread_fn(void* socketNew)
         printf("Client disconnected!\n");
     }
 
-    shutdown(socket, SHUT_RDWR); // Shutdown the socket for reading and writing
-    close(socket); // Close the socket
-    free(buffer); // Free the allocated memory for the buffer
-    sem_post(&seamaphore); // Release the semaphore
-
+cleanup:
+    // Cleanup section - free all allocated resources
+    if (request) ParsedRequest_destroy(request);
+    if (buffer) free(buffer);
+    if (tempReq) free(tempReq);
+    
+    shutdown(socket, SHUT_RDWR);
+    close(socket);
+    
+    sem_post(&seamaphore);
     sem_getvalue(&seamaphore, &p);
     printf("Semaphore value after processing: %d\n", p);
-    free(tempReq); // Free the temporary request memory
-    return NULL; // Return from the thread function
+    
+    return NULL;
 }
-
 
 int main(int argc, char * argv[]) {
 
@@ -481,11 +490,13 @@ int main(int argc, char * argv[]) {
 }
 
 cache_element* find(char* url) {
-    // Checks for the URL in the cache; if found, returns a pointer to the respective cache element or NULL
     cache_element* site = NULL;
 
-    // Lock the mutex to ensure thread-safe access to the cache
     int temp_lock_val = pthread_mutex_lock(&lock);
+    if (temp_lock_val != 0) {
+        perror("Mutex lock failed");
+        return NULL;
+    }
     printf("Cache Lock Acquired for Find: %d\n", temp_lock_val); 
 
     if (head != NULL) {
@@ -494,21 +505,26 @@ cache_element* find(char* url) {
             if (!strcmp(site->url, url)) {
                 printf("LRU Time Track Before: %ld\n", site->lru_time_track);
                 printf("\nURL found\n\n");
-                // Update the last access time for LRU
                 site->lru_time_track = time(NULL);
                 printf("LRU Time Track After: %ld\n", site->lru_time_track);
                 break;
             }
-            site = site->next; // Move to the next cache element
+            site = site->next;
         }       
-    } else {
+    }
+    
+    // Print message if URL was not found
+    if (site == NULL) {
         printf("\nURL not found\n\n");
     }
 
-    // Unlock the mutex after accessing the cache
     temp_lock_val = pthread_mutex_unlock(&lock);
+    if (temp_lock_val != 0) {
+        perror("Mutex unlock failed");
+    }
     printf("Cache Lock Unlocked for Find: %d\n", temp_lock_val); 
-    return site; // Return the found cache element or NULL
+    
+    return site;
 }
 
 void remove_cache_element() {
