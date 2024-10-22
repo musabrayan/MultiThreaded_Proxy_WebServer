@@ -34,9 +34,9 @@ The proxy server serves several purposes:
 
 ## Architecture Diagram
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/musabrayan/MultiThreaded_Proxy_WebServer/main/assets/proxy-architecture.svg" alt="Proxy Server Architecture Diagram" width="800"/>
-</p>
+![{1F4E79C0-D30C-4108-95F3-461577D962B0}](https://github.com/user-attachments/assets/95010d5e-ad22-40a2-8a1b-7667e49f8b44)
+
+
 
 ### Key Components
 - **Thread Pool**: Handles up to 400 concurrent clients
