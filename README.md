@@ -1,4 +1,4 @@
-# Multi-Threaded Proxy Server
+# Multi-Threaded HTTP Proxy Server
 
 This project implements a multi-threaded proxy server that efficiently handles client requests while utilizing caching mechanisms to enhance performance.
 
@@ -31,6 +31,21 @@ The proxy server serves several purposes:
 
 - **Cache Behavior:** If a URL is accessed by multiple clients, each response is stored separately in the cache. This can lead to incomplete responses when retrieving data.
 - **Fixed Cache Size:** Large websites may not be fully cached due to size limitations.
+
+## Architecture Diagram
+
+<p align="center">
+  <img src="./assets/proxy-architecture.svg" alt="Proxy Server Architecture Diagram" width="800"/>
+</p>
+
+The above diagram illustrates the key components of our proxy server:
+- Thread Pool: Handles up to 400 concurrent clients
+- Cache System: 200MB LRU cache for improved performance
+- Request Handler: Processes incoming client requests
+- Error Handler: Manages error scenarios
+- Connection Manager: Handles server connections
+- Synchronization: Ensures thread safety using mutex and semaphores
+
 
 ## Future Enhancements
 
