@@ -88,6 +88,9 @@ The code is thoroughly commented. For any questions or clarifications, please re
    ```
    http://localhost:<port_number>/https://www.cs.princeton.edu/
    ```
+##Output
+
+![image](https://github.com/user-attachments/assets/9d172df8-b3db-490e-b3c2-5161e72909e3)
 
 ## Important Note
 
